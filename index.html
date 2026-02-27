@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Invoice Cost Calculator</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    :root {
+      --bg: #0a0d14;
+      --surface: #111827;
+      --surface2: #1a2235;
+      --border: #1f2d45;
+      --accent: #6366f1;
+      --accent2: #818cf8;
+      --green: #10b981;
+      --yellow: #f59e0b;
+      --red: #ef4444;
+      --purple: #a78bfa;
+      --text: #e2e8f0;
+      --muted: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    header {
+      background: linear-gradient(135deg, #0f1729, #1a1f3a);
+      border-bottom: 1px solid var(--border);
+      padding: 18px 32px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .logo {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--accent), var(--purple));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    header h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+    }
+
+    header p {
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    main {
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 28px 24px;
+    }
+
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: 16px;
+      background: var(--surface);
+      padding: 44px 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .3s;
+      position: relative;
+    }
+
+    .upload-zone:hover,
+    .upload-zone.drag {
+      border-color: var(--accent);
+      background: #131c32;
+    }
+
+    .upload-zone input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .upload-icon {
+      font-size: 2.8rem;
+      margin-bottom: 10px;
+    }
+
+    .upload-zone h2 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .upload-zone p {
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .btn-upload {
+      margin-top: 18px;
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      padding: 9px 26px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.88rem;
+      cursor: pointer;
+      border: none;
+    }
+
+    #fileList {
+      margin-top: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .file-chip {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 5px 12px;
+      font-size: 0.78rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .file-chip .rm {
+      cursor: pointer;
+      color: var(--muted);
+    }
+
+    .file-chip .rm:hover {
+      color: var(--red);
+    }
+
+    #processBtn {
+      display: none;
+      margin-top: 20px;
+      width: 100%;
+      padding: 13px;
+      background: linear-gradient(135deg, var(--accent), #7c3aed);
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    #processBtn:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+
+    #progress {
+      display: none;
+      margin-top: 18px;
+    }
+
+    .progress-bar-wrap {
+      height: 6px;
+      background: var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--green));
+      border-radius: 4px;
+      transition: width .3s;
+    }
+
+    #progressLabel {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    #results {
+      margin-top: 36px;
+      display: none;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+    }
+
+    .stat-card .label {
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      margin-bottom: 7px;
+    }
+
+    .stat-card .value {
+      font-size: 1.5rem;
+      font-weight: 800;
+    }
+
+    .value.green {
+      color: var(--green);
+    }
+
+    .value.accent {
+      color: var(--accent2);
+    }
+
+    .value.yellow {
+      color: var(--yellow);
+    }
+
+    .value.purple {
+      color: var(--purple);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 20px;
+      width: fit-content;
+    }
+
+    .tab {
+      padding: 8px 20px;
+      border-radius: 9px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      transition: all .2s;
+    }
+
+    .tab.active {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .tab:hover:not(.active) {
+      color: var(--text);
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+      align-items: center;
+    }
+
+    .search-input {
+      flex: 1;
+      min-width: 200px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 13px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.85rem;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .sort-select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 13px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    .export-btn {
+      padding: 8px 18px;
+      background: var(--green);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-weight: 600;
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+
+    .export-btn:hover {
+      opacity: .85;
+    }
+
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead {
+      background: var(--surface2);
+    }
+
+    th {
+      padding: 12px 14px;
+      text-align: left;
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th.r {
+      text-align: right;
+    }
+
+    td {
+      padding: 11px 14px;
+      font-size: 0.83rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    td.r {
+      text-align: right;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover td {
+      background: rgba(99, 102, 241, 0.04);
+    }
+
+    .id-cell {
+      font-family: 'Courier New', monospace;
+      font-size: 0.76rem;
+      color: var(--accent2);
+      cursor: pointer;
+    }
+
+    .id-cell:hover {
+      text-decoration: underline;
+    }
+
+    .amount {
+      font-weight: 700;
+      color: var(--green);
+    }
+
+    .category-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .tag {
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: var(--accent2);
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: 0.68rem;
+      white-space: nowrap;
+    }
+
+    .tag.month-tag {
+      background: rgba(245, 158, 11, 0.12);
+      border-color: rgba(245, 158, 11, 0.3);
+      color: var(--yellow);
+    }
+
+    .tag.cat-tag {
+      background: rgba(16, 185, 129, 0.12);
+      border-color: rgba(16, 185, 129, 0.3);
+      color: var(--green);
+    }
+
+    .cat-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+
+    .cat-header {
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      transition: background .2s;
+    }
+
+    .cat-header:hover {
+      background: var(--surface2);
+    }
+
+    .cat-title {
+      font-weight: 700;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .cat-badge {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--green);
+      border-radius: 6px;
+      padding: 2px 10px;
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
+
+    .cat-total {
+      font-weight: 800;
+      color: var(--green);
+      font-size: 1.05rem;
+    }
+
+    .cat-body {
+      display: none;
+      border-top: 1px solid var(--border);
+    }
+
+    .cat-body.open {
+      display: block;
+    }
+
+    .month-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+
+    .month-header {
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      transition: background .2s;
+    }
+
+    .month-header:hover {
+      background: var(--surface2);
+    }
+
+    .month-title {
+      font-weight: 700;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .month-badge {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: var(--yellow);
+      border-radius: 6px;
+      padding: 2px 10px;
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
+
+    .month-total {
+      font-weight: 800;
+      color: var(--green);
+      font-size: 1.05rem;
+    }
+
+    .month-body {
+      display: none;
+      border-top: 1px solid var(--border);
+    }
+
+    .month-body.open {
+      display: block;
+    }
+
+    .pivot-wrap {
+      overflow-x: auto;
+    }
+
+    .pivot-table {
+      border-collapse: collapse;
+      font-size: 0.78rem;
+      min-width: 600px;
+      width: 100%;
+    }
+
+    .pivot-table th,
+    .pivot-table td {
+      padding: 9px 12px;
+      white-space: nowrap;
+    }
+
+    .pivot-table thead th {
+      background: var(--surface2);
+      color: var(--muted);
+      text-transform: uppercase;
+      font-size: 0.68rem;
+      letter-spacing: .05em;
+      border: 1px solid var(--border);
+    }
+
+    .pivot-table td {
+      border: 1px solid var(--border);
+    }
+
+    .pivot-table td.id-col {
+      font-family: monospace;
+      color: var(--accent2);
+      font-size: 0.73rem;
+      cursor: pointer;
+    }
+
+    .pivot-table td.id-col:hover {
+      text-decoration: underline;
+    }
+
+    .pivot-table td.amt-cell {
+      text-align: right;
+      color: var(--green);
+      font-weight: 600;
+    }
+
+    .pivot-table td.amt-cell.zero {
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    .pivot-table td.total-col {
+      text-align: right;
+      font-weight: 800;
+      color: var(--green);
+      background: rgba(16, 185, 129, 0.06);
+    }
+
+    .pivot-table tr:hover td {
+      background: rgba(99, 102, 241, 0.05);
+    }
+
+    .pivot-table tfoot td,
+    .pivot-table tfoot th {
+      background: var(--surface2);
+      font-weight: 700;
+      border: 1px solid var(--border);
+    }
+
+    .pivot-table tfoot td {
+      text-align: right;
+      color: var(--green);
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 740px;
+      max-height: 85vh;
+      overflow-y: auto;
+      animation: modalIn .2s ease;
+    }
+
+    @keyframes modalIn {
+      from {
+        transform: scale(.95);
+        opacity: 0;
+      }
+
+      to {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    .modal-header {
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+    }
+
+    .modal-header h3 {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .modal-id {
+      font-family: monospace;
+      font-size: 0.73rem;
+      color: var(--accent2);
+      word-break: break-all;
+      margin-top: 4px;
+    }
+
+    .modal-close {
+      cursor: pointer;
+      font-size: 1.4rem;
+      border: none;
+      background: none;
+      color: var(--muted);
+    }
+
+    .modal-close:hover {
+      color: var(--text);
+    }
+
+    .modal-body {
+      padding: 18px 22px;
+    }
+
+    .modal-section {
+      margin-bottom: 18px;
+    }
+
+    .modal-section h4 {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 9px;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 7px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.83rem;
+    }
+
+    .detail-row:last-child {
+      border-bottom: none;
+    }
+
+    .detail-row .amt {
+      font-weight: 600;
+      color: var(--green);
+    }
+
+    .modal-total {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px 0 0;
+      font-weight: 700;
+      font-size: 1rem;
+    }
+
+    .section-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .section-sub {
+      color: var(--muted);
+      font-size: 0.82rem;
+      margin-bottom: 22px;
+    }
+
+    .empty {
+      text-align: center;
+      padding: 50px;
+      color: var(--muted);
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 22px;
+      right: 22px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 11px 18px;
+      font-size: 0.83rem;
+      z-index: 200;
+      animation: slideIn .3s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(100px);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @media(max-width:640px) {
+      main {
+        padding: 16px 12px;
+      }
+
+      .tabs {
+        flex-wrap: wrap;
+        width: 100%;
+      }
+
+      .tab {
+        flex: 1;
+        text-align: center;
+        padding: 8px 10px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="logo">📄</div>
+    <div>
+      <h1>Invoice Cost Calculator</h1>
+      <p>Upload Replit invoices · Aggregate costs by Billing ID · Monthly breakdown</p>
+    </div>
+  </header>
+
+  <main>
+    <div class="upload-zone" id="dropZone">
+      <input type="file" id="fileInput" accept=".pdf" multiple />
+      <div class="upload-icon">☁️</div>
+      <h2>Drop PDF invoices here</h2>
+      <p>Supports single or bulk upload of Replit invoice PDFs</p>
+      <button class="btn-upload" onclick="document.getElementById('fileInput').click();event.preventDefault();">Browse
+        Files</button>
+    </div>
+
+    <div id="fileList"></div>
+    <button id="processBtn" onclick="processFiles()">⚡ Parse &amp; Calculate</button>
+    <div id="progress">
+      <div id="progressLabel">Processing 0 / 0...</div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar" id="progressBar" style="width:0%"></div>
+      </div>
+    </div>
+
+    <div id="results">
+      <div class="section-title">Cost Summary</div>
+      <div class="section-sub" id="resultsSub"></div>
+      <div class="stats" id="statsRow"></div>
+
+      <div class="tabs">
+        <button class="tab active" id="tab-id" onclick="switchTab('id')">🆔 By Billing ID</button>
+        <button class="tab" id="tab-month" onclick="switchTab('month')">📅 By Month</button>
+        <button class="tab" id="tab-category" onclick="switchTab('category')">🏷️ By Category</button>
+        <button class="tab" id="tab-pivot" onclick="switchTab('pivot')">⊞ Month × ID Pivot</button>
+      </div>
+
+      <!-- Tab: By Billing ID -->
+      <div id="view-id">
+        <div class="controls">
+          <input class="search-input" id="searchInput" placeholder="🔍 Search billing ID..."
+            oninput="renderIdTable()" />
+          <select class="sort-select" id="sortSelect" onchange="renderIdTable()">
+            <option value="amount_desc">Amount ↓</option>
+            <option value="amount_asc">Amount ↑</option>
+            <option value="id_asc">ID A→Z</option>
+            <option value="categories">Category Count</option>
+          </select>
+          <button class="export-btn" onclick="exportCSV()">⬇ Export CSV</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Billing ID</th>
+                <th>Categories</th>
+                <th>Months Active</th>
+                <th class="r">Invoices</th>
+                <th class="r">Total</th>
+              </tr>
+            </thead>
+            <tbody id="idTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab: By Month -->
+      <div id="view-month" style="display:none;">
+        <div id="monthAccordion"></div>
+      </div>
+
+      <!-- Tab: By Category -->
+      <div id="view-category" style="display:none;">
+        <div class="controls" style="margin-bottom:16px;">
+          <button class="export-btn" onclick="exportCategoryCSV()">⬇ Export Category CSV</button>
+        </div>
+        <div id="catAccordion"></div>
+      </div>
+
+      <!-- Tab: Pivot -->
+      <div id="view-pivot" style="display:none;">
+        <div class="controls">
+          <input class="search-input" id="pivotSearch" placeholder="🔍 Filter billing ID..." oninput="renderPivot()"
+            style="max-width:320px;" />
+          <button class="export-btn" onclick="exportPivotCSV()">⬇ Export Pivot CSV</button>
+        </div>
+        <div class="table-wrap pivot-wrap">
+          <table class="pivot-table" id="pivotTable"></table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h3>Billing ID Details</h3>
+          <div class="modal-id" id="modalId"></div>
+        </div>
+        <button class="modal-close" onclick="closeModalDirect()">×</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    let files = [];
+    let byId = {};    // id -> {categories:{}, months:{}, invoices:Set}
+    let byMonth = {}; // month -> {id:total}
+    let monthOrder = [];
+
+    // ── File handling ──────────────────────────────────────────────────────────
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault(); dropZone.classList.remove('drag');
+      addFiles([...e.dataTransfer.files].filter(f => f.name.endsWith('.pdf')));
+    });
+    fileInput.addEventListener('change', () => { addFiles([...fileInput.files]); fileInput.value = ''; });
+
+    function addFiles(nf) { nf.forEach(f => { if (!files.find(x => x.name === f.name)) files.push(f); }); renderFileList(); }
+    function removeFile(name) { files = files.filter(f => f.name !== name); renderFileList(); }
+    function renderFileList() {
+      document.getElementById('fileList').innerHTML = files.map(f =>
+        `<div class="file-chip">📄 ${f.name} <span class="rm" onclick="removeFile('${f.name}')">×</span></div>`).join('');
+      document.getElementById('processBtn').style.display = files.length ? 'block' : 'none';
+    }
+
+    // ── Process ────────────────────────────────────────────────────────────────
+    async function processFiles() {
+      if (!files.length) return;
+      byId = {}; byMonth = {}; monthOrder = [];
+      const btn = document.getElementById('processBtn');
+      btn.disabled = true; btn.textContent = '⏳ Processing...';
+      document.getElementById('progress').style.display = 'block';
+      document.getElementById('results').style.display = 'none';
+      for (let i = 0; i < files.length; i++) {
+        setProgress(i, files.length, files[i].name);
+        await parseInvoicePDF(files[i]);
+      }
+      setProgress(files.length, files.length, 'Done!');
+      btn.disabled = false; btn.textContent = '⚡ Parse & Calculate';
+      renderResults();
+    }
+    function setProgress(d, t, label) {
+      document.getElementById('progressLabel').textContent = `Processing ${d} / ${t} — ${label}`;
+      document.getElementById('progressBar').style.width = t ? (d / t * 100) + '%' : '0%';
+    }
+
+    // ── PDF parser ─────────────────────────────────────────────────────────────
+    async function parseInvoicePDF(file) {
+      const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+      const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const AMT = /^-?\$[\d,]+\.?\d*$/;
+      const CATS = ['Agent Usage', 'Autoscale Deployments', 'Autoscale Requests',
+        'Deployments Outbound Data Transfer', 'Neon Compute Time',
+        'Egress', 'Storage', 'Bandwidth', 'Compute', 'Database'];
+
+      // Detect invoice month from page 1
+      let invoiceMonth = null;
+      {
+        const fc = await (await pdf.getPage(1)).getTextContent();
+        const txt = fc.items.map(i => i.str).join(' ');
+        // "Invoice date   Jan 24, 2026"
+        let m = txt.match(/Invoice\s+date\s+([A-Za-z]+ \d+,\s*\d{4})/i);
+        if (m) { const d = new Date(m[1]); if (!isNaN(d)) invoiceMonth = d.toLocaleString('en-US', { month: 'long', year: 'numeric' }); }
+        // billing period "Dec 24, 2025 – Jan 23, 2026" — take end date
+        if (!invoiceMonth) {
+          m = txt.match(/([A-Za-z]+ \d+,?\s*\d{4})\s*[–—-]+\s*([A-Za-z]+ \d+,?\s*\d{4})/);
+          if (m) { const d = new Date(m[2]); if (!isNaN(d)) invoiceMonth = d.toLocaleString('en-US', { month: 'long', year: 'numeric' }); }
+        }
+        if (!invoiceMonth) invoiceMonth = file.name.replace('.pdf', '');
+      }
+      if (!byMonth[invoiceMonth]) { byMonth[invoiceMonth] = {}; monthOrder.push(invoiceMonth); }
+
+      let currentCat = null;
+      for (let p = 1; p <= pdf.numPages; p++) {
+        const content = await (await pdf.getPage(p)).getTextContent();
+        const lines = {};
+        content.items.forEach(item => {
+          const y = Math.round(item.transform[5]);
+          if (!lines[y]) lines[y] = [];
+          lines[y].push({ x: Math.round(item.transform[4]), text: item.str.trim() });
+        });
+        Object.keys(lines).map(Number).sort((a, b) => b - a).forEach(y => {
+          const texts = lines[y].sort((a, b) => a.x - b.x).map(r => r.text).filter(t => t);
+          const full = texts.join(' ');
+          for (const c of CATS) { if (full.includes(c)) { currentCat = c; return; } }
+          if (texts.length >= 2 && UUID.test(texts[0])) {
+            const id = texts[0].toLowerCase();
+            let amt = 0;
+            for (let i = texts.length - 1; i >= 1; i--) {
+              const c = texts[i].replace(/,/g, '');
+              if (AMT.test(c)) { amt = parseFloat(c.replace('$', '')); break; }
+            }
+            if (amt === 0) return;
+            const cat = currentCat || 'Other';
+            if (!byId[id]) byId[id] = { categories: {}, months: {}, invoices: new Set() };
+            byId[id].categories[cat] = (byId[id].categories[cat] || 0) + amt;
+            byId[id].months[invoiceMonth] = (byId[id].months[invoiceMonth] || 0) + amt;
+            byId[id].invoices.add(file.name);
+            byMonth[invoiceMonth][id] = (byMonth[invoiceMonth][id] || 0) + amt;
+          }
+        });
+      }
+    }
+
+    function getTotal(id) { return Object.values(byId[id].categories).reduce((a, b) => a + b, 0); }
+    function getMonthTotal(m) { return Object.values(byMonth[m]).reduce((a, b) => a + b, 0); }
+
+    // ── Render ─────────────────────────────────────────────────────────────────
+    function renderResults() {
+      const ids = Object.keys(byId);
+      const grand = ids.reduce((s, id) => s + getTotal(id), 0);
+      const maxA = ids.length ? Math.max(...ids.map(id => getTotal(id))) : 0;
+      const months = Object.keys(byMonth);
+      document.getElementById('results').style.display = 'block';
+      document.getElementById('resultsSub').textContent =
+        `Parsed ${files.length} invoice(s) · ${ids.length} unique billing IDs · ${months.length} month(s)`;
+      document.getElementById('statsRow').innerHTML = `
+    <div class="stat-card"><div class="label">Grand Total</div><div class="value green">$${grand.toFixed(2)}</div></div>
+    <div class="stat-card"><div class="label">Billing IDs</div><div class="value accent">${ids.length}</div></div>
+    <div class="stat-card"><div class="label">Invoices</div><div class="value yellow">${files.length}</div></div>
+    <div class="stat-card"><div class="label">Months</div><div class="value purple">${months.length}</div></div>
+    <div class="stat-card"><div class="label">Highest Bill</div><div class="value green">$${maxA.toFixed(2)}</div></div>
+  `;
+      renderIdTable(); renderMonthView(); renderCategoryView(); renderPivot();
+    }
+
+    function renderIdTable() {
+      const search = (document.getElementById('searchInput').value || '').toLowerCase();
+      const sort = document.getElementById('sortSelect').value;
+      let ids = Object.keys(byId).filter(id => id.includes(search));
+      if (sort === 'amount_desc') ids.sort((a, b) => getTotal(b) - getTotal(a));
+      else if (sort === 'amount_asc') ids.sort((a, b) => getTotal(a) - getTotal(b));
+      else if (sort === 'id_asc') ids.sort();
+      else ids.sort((a, b) => Object.keys(byId[b].categories).length - Object.keys(byId[a].categories).length);
+      const tbody = document.getElementById('idTableBody');
+      if (!ids.length) { tbody.innerHTML = `<tr><td colspan="6"><div class="empty">No results</div></td></tr>`; return; }
+      tbody.innerHTML = ids.map((id, i) => {
+        const cats = Object.keys(byId[id].categories);
+        const months = Object.keys(byId[id].months);
+        return `<tr>
+      <td style="color:var(--muted)">${i + 1}</td>
+      <td><span class="id-cell" onclick="showDetail('${id}')">${id}</span></td>
+      <td><div class="category-tags">${cats.map(c => `<span class="tag">${c}</span>`).join('')}</div></td>
+      <td><div class="category-tags">${months.map(m => `<span class="tag month-tag">${m}</span>`).join('')}</div></td>
+      <td class="r" style="color:var(--muted)">${byId[id].invoices.size}</td>
+      <td class="r"><span class="amount">$${getTotal(id).toFixed(2)}</span></td>
+    </tr>`;
+      }).join('');
+    }
+
+    function renderMonthView() {
+      const sortedM = [...monthOrder].sort((a, b) => new Date(a) - new Date(b));
+      document.getElementById('monthAccordion').innerHTML = sortedM.map((m, mi) => {
+        const mIds = Object.entries(byMonth[m]).sort(([, a], [, b]) => b - a);
+        const rows = mIds.map(([id, amt], i) => `<tr>
+      <td style="color:var(--muted)">${i + 1}</td>
+      <td><span class="id-cell" onclick="showDetail('${id}')">${id}</span></td>
+      <td><div class="category-tags">${Object.keys(byId[id].categories).map(c => `<span class="tag">${c}</span>`).join('')}</div></td>
+      <td class="r"><span class="amount">$${amt.toFixed(2)}</span></td>
+    </tr>`).join('');
+        return `<div class="month-block">
+      <div class="month-header" onclick="toggleMonth('mb${mi}')">
+        <div class="month-title">📅 ${m} <span class="month-badge">${mIds.length} Billing IDs</span></div>
+        <div class="month-total">$${getMonthTotal(m).toFixed(2)}</div>
+      </div>
+      <div class="month-body" id="mb${mi}">
+        <table>
+          <thead><tr><th>#</th><th>Billing ID</th><th>Categories</th><th class="r">Amount (this month)</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+      }).join('');
+      if (sortedM.length) toggleMonth('mb0');
+    }
+    function toggleMonth(id) { document.getElementById(id).classList.toggle('open'); }
+
+    function renderCategoryView() {
+      // Build byCategory: {catName -> {id -> total}}
+      const byCategory = {};
+      Object.entries(byId).forEach(([id, data]) => {
+        Object.entries(data.categories).forEach(([cat, amt]) => {
+          if (!byCategory[cat]) byCategory[cat] = {};
+          byCategory[cat][id] = (byCategory[cat][id] || 0) + amt;
+        });
+      });
+
+      const sortedCats = Object.keys(byCategory).sort((a, b) => {
+        const totA = Object.values(byCategory[a]).reduce((s, v) => s + v, 0);
+        const totB = Object.values(byCategory[b]).reduce((s, v) => s + v, 0);
+        return totB - totA;
+      });
+
+      document.getElementById('catAccordion').innerHTML = sortedCats.map((cat, ci) => {
+        const catIds = Object.entries(byCategory[cat]).sort(([, a], [, b]) => b - a);
+        const catTotal = catIds.reduce((s, [, v]) => s + v, 0);
+        const rows = catIds.map(([id, amt], i) => `<tr>
+          <td style="color:var(--muted)">${i + 1}</td>
+          <td><span class="id-cell" onclick="showDetail('${id}')">${id}</span></td>
+          <td><div class="category-tags">${Object.keys(byId[id].months).map(m => `<span class="tag month-tag">${m}</span>`).join('')}</div></td>
+          <td class="r"><span class="amount">$${amt.toFixed(2)}</span></td>
+          <td class="r" style="color:var(--muted);font-size:0.75rem">${catTotal > 0 ? (amt / catTotal * 100).toFixed(1) + '%' : '—'}</td>
+        </tr>`).join('');
+        return `<div class="cat-block">
+          <div class="cat-header" onclick="toggleCat('cb${ci}')">
+            <div class="cat-title">🏷️ ${cat} <span class="cat-badge">${catIds.length} IDs</span></div>
+            <div class="cat-total">$${catTotal.toFixed(2)}</div>
+          </div>
+          <div class="cat-body" id="cb${ci}">
+            <table>
+              <thead><tr><th>#</th><th>Billing ID</th><th>Months</th><th class="r">Amount</th><th class="r">% of Category</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>`;
+      }).join('');
+
+      if (sortedCats.length) toggleCat('cb0');
+    }
+    function toggleCat(id) { document.getElementById(id).classList.toggle('open'); }
+
+    function renderPivot() {
+      const search = (document.getElementById('pivotSearch') ? document.getElementById('pivotSearch').value : '').toLowerCase();
+      const sortedM = [...monthOrder].sort((a, b) => new Date(a) - new Date(b));
+      let ids = Object.keys(byId).filter(id => id.includes(search));
+      ids.sort((a, b) => getTotal(b) - getTotal(a));
+      if (!ids.length || !sortedM.length) {
+        document.getElementById('pivotTable').innerHTML = `<tr><td><div class="empty">No data</div></td></tr>`; return;
+      }
+      const hdr = `<thead><tr><th style="min-width:260px">Billing ID</th>${sortedM.map(m => `<th>${m}</th>`).join('')}<th>Total</th></tr></thead>`;
+      const body = ids.map(id => `<tr>
+    <td class="id-col" onclick="showDetail('${id}')">${id}</td>
+    ${sortedM.map(m => { const a = byMonth[m][id] || 0; return `<td class="amt-cell${a ? '' : ' zero'}">${a ? '$' + a.toFixed(2) : '—'}</td>`; }).join('')}
+    <td class="total-col">$${getTotal(id).toFixed(2)}</td>
+  </tr>`).join('');
+      const grand = ids.reduce((s, id) => s + getTotal(id), 0);
+      const foot = `<tfoot><tr><th>TOTAL</th>${sortedM.map(m => `<td>$${getMonthTotal(m).toFixed(2)}</td>`).join('')}<td class="total-col">$${grand.toFixed(2)}</td></tr></tfoot>`;
+      document.getElementById('pivotTable').innerHTML = hdr + `<tbody>${body}</tbody>` + foot;
+    }
+
+    function switchTab(name) {
+      ['id', 'month', 'category', 'pivot'].forEach(t => {
+        document.getElementById('view-' + t).style.display = t === name ? 'block' : 'none';
+        document.getElementById('tab-' + t).classList.toggle('active', t === name);
+      });
+    }
+
+    function showDetail(id) {
+      document.getElementById('modalId').textContent = id;
+      const data = byId[id];
+      const total = getTotal(id);
+      const sortedM = [...monthOrder].sort((a, b) => new Date(a) - new Date(b));
+      const catRows = Object.entries(data.categories).sort(([, a], [, b]) => b - a)
+        .map(([c, a]) => `<div class="detail-row"><span>${c}</span><span class="amt">$${a.toFixed(2)}</span></div>`).join('');
+      const monthRows = sortedM.filter(m => data.months[m])
+        .map(m => `<div class="detail-row"><span>📅 ${m}</span><span class="amt">$${data.months[m].toFixed(2)}</span></div>`).join('');
+      const invRows = [...data.invoices].map(f => `<div class="detail-row"><span>📄 ${f}</span></div>`).join('');
+      document.getElementById('modalBody').innerHTML = `
+    <div class="modal-section"><h4>Cost by Category</h4>${catRows}
+      <div class="modal-total"><span>Total</span><span style="color:var(--green)">$${total.toFixed(2)}</span></div>
+    </div>
+    <div class="modal-section"><h4>Cost by Month</h4>${monthRows || '<div style="color:var(--muted)">No month data</div>'}</div>
+    <div class="modal-section"><h4>Source Invoices</h4>${invRows}</div>
+  `;
+      document.getElementById('modalOverlay').classList.add('open');
+    }
+    function closeModal(e) { if (e.target === document.getElementById('modalOverlay')) closeModalDirect(); }
+    function closeModalDirect() { document.getElementById('modalOverlay').classList.remove('open'); }
+
+    function exportCSV() {
+      const ids = Object.keys(byId);
+      const allCats = [...new Set(ids.flatMap(id => Object.keys(byId[id].categories)))];
+      const allM = [...monthOrder].sort((a, b) => new Date(a) - new Date(b));
+      const hdr = ['Billing ID', ...allCats, ...allM.map(m => 'Month:' + m), 'Total'];
+      const rows = ids.map(id => [id, ...allCats.map(c => (byId[id].categories[c] || 0).toFixed(2)),
+        ...allM.map(m => (byId[id].months[m] || 0).toFixed(2)), getTotal(id).toFixed(2)]);
+      dlCSV([hdr, ...rows], 'invoice_cost_summary.csv');
+    }
+    function exportCategoryCSV() {
+      const byCategory = {};
+      Object.entries(byId).forEach(([id, data]) => {
+        Object.entries(data.categories).forEach(([cat, amt]) => {
+          if (!byCategory[cat]) byCategory[cat] = {};
+          byCategory[cat][id] = (byCategory[cat][id] || 0) + amt;
+        });
+      });
+      const rows = [];
+      rows.push(['Category', 'Billing ID', 'Amount', '% of Category']);
+      Object.entries(byCategory).sort(([, a], [, b]) => {
+        const tA = Object.values(a).reduce((s, v) => s + v, 0);
+        const tB = Object.values(b).reduce((s, v) => s + v, 0);
+        return tB - tA;
+      }).forEach(([cat, ids]) => {
+        const catTotal = Object.values(ids).reduce((s, v) => s + v, 0);
+        Object.entries(ids).sort(([, a], [, b]) => b - a).forEach(([id, amt]) => {
+          rows.push([cat, id, amt.toFixed(2), (amt / catTotal * 100).toFixed(1) + '%']);
+        });
+        rows.push([cat + ' TOTAL', '', catTotal.toFixed(2), '100%']);
+      });
+      dlCSV(rows, 'invoice_by_category.csv');
+    }
+    function exportPivotCSV() {
+      const ids = Object.keys(byId).sort((a, b) => getTotal(b) - getTotal(a));
+      const months = [...monthOrder].sort((a, b) => new Date(a) - new Date(b));
+      const hdr = ['Billing ID', ...months, 'Total'];
+      const rows = ids.map(id => [id, ...months.map(m => (byMonth[m][id] || 0).toFixed(2)), getTotal(id).toFixed(2)]);
+      const foot = ['TOTAL', ...months.map(m => getMonthTotal(m).toFixed(2)), ids.reduce((s, id) => s + getTotal(id), 0).toFixed(2)];
+      dlCSV([hdr, ...rows, foot], 'invoice_pivot.csv');
+    }
+    function dlCSV(rows, name) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n')], { type: 'text/csv' }));
+      a.download = name; a.click(); showToast('✅ ' + name + ' exported!');
+    }
+    function showToast(msg) {
+      const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+      document.body.appendChild(t); setTimeout(() => t.remove(), 3000);
+    }
+  </script>
+</body>
+
+</html>
