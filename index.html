@@ -739,6 +739,137 @@
       color: var(--muted);
     }
 
+    /* LOG PANEL */
+    .log-panel {
+      margin-top: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .log-header {
+      padding: 12px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      transition: background .2s;
+    }
+
+    .log-header:hover {
+      background: var(--surface2);
+    }
+
+    .log-header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .log-count {
+      background: rgba(99, 102, 241, 0.2);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      color: var(--accent2);
+      border-radius: 6px;
+      padding: 1px 9px;
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
+
+    .log-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .log-dl-btn {
+      padding: 5px 13px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface2);
+      color: var(--text);
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .log-dl-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent2);
+    }
+
+    .log-body {
+      display: none;
+      border-top: 1px solid var(--border);
+      max-height: 320px;
+      overflow-y: auto;
+    }
+
+    .log-body.open {
+      display: block;
+    }
+
+    .log-entry {
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px;
+      font-size: 0.8rem;
+    }
+
+    .log-entry:last-child {
+      border-bottom: none;
+    }
+
+    .log-entry-main {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .log-filename {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .log-meta {
+      color: var(--muted);
+      font-size: 0.72rem;
+    }
+
+    .log-entry-right {
+      text-align: right;
+    }
+
+    .log-ids {
+      font-size: 0.72rem;
+      color: var(--accent2);
+    }
+
+    .log-amt {
+      font-weight: 700;
+      color: var(--green);
+      font-size: 0.82rem;
+    }
+
+    .log-ts {
+      font-size: 0.68rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .log-status-ok {
+      color: var(--green);
+    }
+
+    .log-status-err {
+      color: var(--red);
+    }
+
     .toast {
       position: fixed;
       bottom: 22px;
@@ -807,6 +938,20 @@
 
     <div id="fileList"></div>
     <button id="processBtn" onclick="processFiles()">⚡ Parse &amp; Calculate</button>
+
+    <!-- SESSION LOG PANEL -->
+    <div class="log-panel" id="logPanel" style="display:none;">
+      <div class="log-header" onclick="toggleLog()">
+        <div class="log-header-left">
+          📋 Upload Log <span class="log-count" id="logCount">0</span>
+        </div>
+        <div class="log-actions" onclick="event.stopPropagation()">
+          <button class="log-dl-btn" onclick="downloadLog('json')">⬇ JSON</button>
+          <button class="log-dl-btn" onclick="downloadLog('txt')">⬇ TXT</button>
+        </div>
+      </div>
+      <div class="log-body" id="logBody"></div>
+    </div>
     <div id="progress">
       <div id="progressLabel">Processing 0 / 0...</div>
       <div class="progress-bar-wrap">
@@ -903,6 +1048,7 @@
     let byId = {};    // id -> {categories:{}, months:{}, invoices:Set}
     let byMonth = {}; // month -> {id:total}
     let monthOrder = [];
+    let sessionLog = []; // upload log entries
 
     // ── File handling ──────────────────────────────────────────────────────────
     const dropZone = document.getElementById('dropZone');
@@ -933,10 +1079,36 @@
       document.getElementById('results').style.display = 'none';
       for (let i = 0; i < files.length; i++) {
         setProgress(i, files.length, files[i].name);
-        await parseInvoicePDF(files[i]);
+        const t0 = Date.now();
+        let logEntry = {
+          filename: files[i].name,
+          sizeBytes: files[i].size,
+          timestamp: new Date().toISOString(),
+          parseDurationMs: 0,
+          invoiceMonth: null,
+          billingIdsFound: 0,
+          totalAmount: 0,
+          status: 'ok',
+          error: null
+        };
+        try {
+          await parseInvoicePDF(files[i], logEntry);
+          logEntry.parseDurationMs = Date.now() - t0;
+          // count IDs that touched this file
+          logEntry.billingIdsFound = Object.values(byId).filter(d => d.invoices.has(files[i].name)).length;
+          logEntry.totalAmount = Object.values(byId)
+            .filter(d => d.invoices.has(files[i].name))
+            .reduce((s, d) => s + Object.values(d.categories).reduce((a, b) => a + b, 0), 0);
+        } catch (e) {
+          logEntry.status = 'error';
+          logEntry.error = e.message;
+          logEntry.parseDurationMs = Date.now() - t0;
+        }
+        sessionLog.push(logEntry);
       }
       setProgress(files.length, files.length, 'Done!');
       btn.disabled = false; btn.textContent = '⚡ Parse & Calculate';
+      renderLog();
       renderResults();
     }
     function setProgress(d, t, label) {
@@ -945,7 +1117,7 @@
     }
 
     // ── PDF parser ─────────────────────────────────────────────────────────────
-    async function parseInvoicePDF(file) {
+    async function parseInvoicePDF(file, logEntry) {
       const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
       const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       const AMT = /^-?\$[\d,]+\.?\d*$/;
@@ -968,6 +1140,7 @@
         }
         if (!invoiceMonth) invoiceMonth = file.name.replace('.pdf', '');
       }
+      if (logEntry) logEntry.invoiceMonth = invoiceMonth;
       if (!byMonth[invoiceMonth]) { byMonth[invoiceMonth] = {}; monthOrder.push(invoiceMonth); }
 
       let currentCat = null;
@@ -1000,6 +1173,67 @@
           }
         });
       }
+    }
+
+    // ── Log panel ──────────────────────────────────────────────────────────────
+    function renderLog() {
+      const panel = document.getElementById('logPanel');
+      const body = document.getElementById('logBody');
+      const count = document.getElementById('logCount');
+      if (!sessionLog.length) { panel.style.display = 'none'; return; }
+      panel.style.display = 'block';
+      count.textContent = sessionLog.length;
+      body.innerHTML = [...sessionLog].reverse().map(e => {
+        const kb = (e.sizeBytes / 1024).toFixed(1);
+        const ts = new Date(e.timestamp).toLocaleTimeString();
+        const ok = e.status === 'ok';
+        return `<div class="log-entry">
+          <div>
+            <div class="log-entry-main">
+              <span class="${ok ? 'log-status-ok' : 'log-status-err'}">${ok ? '✔' : '✖'}</span>
+              <span class="log-filename">📄 ${e.filename}</span>
+              <span class="log-meta">${kb} KB · ${e.parseDurationMs}ms · ${e.invoiceMonth || '—'}</span>
+            </div>
+            ${e.error ? `<div class="log-meta" style="color:var(--red);margin-top:3px">${e.error}</div>` : ''}
+          </div>
+          <div class="log-entry-right">
+            <div class="log-ids">${e.billingIdsFound} IDs</div>
+            <div class="log-amt">$${e.totalAmount.toFixed(2)}</div>
+            <div class="log-ts">${ts}</div>
+          </div>
+        </div>`;
+      }).join('');
+      // auto-open on first populate
+      //if (!body.classList.contains('open')) body.classList.add('open');
+    }
+    function toggleLog() { document.getElementById('logBody').classList.toggle('open'); }
+    function downloadLog(fmt) {
+      let content, mime, ext;
+      if (fmt === 'json') {
+        content = JSON.stringify(sessionLog, null, 2);
+        mime = 'application/json'; ext = 'json';
+      } else {
+        const lines = ['Invoice Cost Calculator — Upload Log', '='.repeat(50), ''];
+        sessionLog.forEach((e, i) => {
+          lines.push(`[${i + 1}] ${e.filename}`);
+          lines.push(`    Status    : ${e.status}${e.error ? ' — ' + e.error : ''}`);
+          lines.push(`    Timestamp : ${e.timestamp}`);
+          lines.push(`    Month     : ${e.invoiceMonth || '—'}`);
+          lines.push(`    Size      : ${(e.sizeBytes / 1024).toFixed(1)} KB`);
+          lines.push(`    Parse time: ${e.parseDurationMs}ms`);
+          lines.push(`    IDs found : ${e.billingIdsFound}`);
+          lines.push(`    Total amt : $${e.totalAmount.toFixed(2)}`);
+          lines.push('');
+        });
+        lines.push(`Generated: ${new Date().toISOString()}`);
+        content = lines.join('\n');
+        mime = 'text/plain'; ext = 'txt';
+      }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([content], { type: mime }));
+      a.download = `upload_log_${new Date().toISOString().slice(0, 10)}.${ext}`;
+      a.click();
+      showToast(`✅ Log downloaded as .${ext}`);
     }
 
     function getTotal(id) { return Object.values(byId[id].categories).reduce((a, b) => a + b, 0); }
